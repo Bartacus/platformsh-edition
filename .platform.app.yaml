@@ -1,0 +1,146 @@
+# The name of this app. Must be unique within a project.
+name: app
+
+# The type of the application to build.
+type: php:7.1
+build:
+    flavor: composer
+
+runtime:
+    extensions:
+        - apcu
+        - redis
+        - imagick
+    sizing_hints:
+        request_memory: 10
+
+# The relationships of the application with services or other applications.
+# The left-hand side is the name of the relationship as it will be exposed
+# to the application in the PLATFORM_RELATIONSHIPS variable. The right-hand
+# side is in the form `:`.
+relationships:
+    database: 'mysqldb:mysql'
+    redis: 'rediscache:redis'
+
+# The configuration of app when it is exposed to the web.
+web:
+    locations:
+        '/':
+            # The public directory of the app, relative to its root.
+            root: 'web'
+            # The front-controller script to send non-static requests to.
+            passthru: '/index.php'
+            index:
+                - 'index.php'
+            allow: false
+            rules:
+                # Allow access to common static files.
+                '\.(jpe?g|png|gif|svgz?|css|js|map|ico|bmp|eot|woff2?|otf|ttf)$':
+                    expires: 7d
+                    allow: true
+                '^/robots\.txt$':
+                    allow: true
+                '^/sitemap\.xml$':
+                    allow: true
+        '/uploads':
+            root: 'web/uploads'
+            scripts: false
+            allow: true
+            passthru: '/index.php'
+        '/fileadmin':
+            root: 'web/fileadmin'
+            scripts: false
+            allow: true
+            passthru: '/index.php'
+        '/fileadmin/_processed_':
+            root: 'web/fileadmin/_processed_'
+            expires: 7d
+            scripts: false
+            allow: true
+            passthru: false
+        '/typo3temp/assets':
+            root: 'web/typo3temp/assets'
+            expires: 7d
+            scripts: false
+            allow: true
+            passthru: false
+            rules:
+                '\.js\.gzip$':
+                    headers:
+                        Content-Type: text/javascript
+                        Content-Encoding: gzip
+                '\.css\.gzip$':
+                    headers:
+                        Content-Type: text/css
+                        Content-Encoding: gzip
+        '/typo3conf/LocalConfiguration.php':
+            allow: false
+        '/typo3conf/AdditionalConfiguration.php':
+            allow: false
+
+# The size of the persistent disk of the application (in MB).
+disk: 2048
+
+# The mounts that will be performed when the package is deployed.
+mounts:
+    '/var/cache': 'shared:files/symfony-cache'
+    '/var/logs': 'shared:files/symfony-logs'
+    '/var/sessions': 'shared:files/symfony-sessions'
+    '/web/typo3temp': 'shared:files/typo3-tmp'
+    '/web/uploads': 'shared:files/typo3-uploads'
+    '/web/fileadmin': 'shared:files/typo3-fileadmin'
+    '/web/typo3conf/writeable': 'shared:files/typo3-config'
+
+# The hooks that will be performed when the package is deployed.
+hooks:
+    build: |
+        set -ex
+
+        vendor/bin/typo3cms install:generatepackagestates --remove-inactive
+
+        ###FIRST_INSTALL>###
+        if [ ! -f web/typo3conf/writeable/installed.lock ]; then
+            cd web/
+            ln -s typo3conf/writeable/FIRST_INSTALL FIRST_INSTALL
+            touch FIRST_INSTALL
+            cd typo3conf/
+            ln -s writeable/LocalConfiguration.php LocalConfiguration.php
+            cd ../../
+        fi
+        ###<FIRST_INSTALL###
+
+        cd web/typo3conf/
+        ln -s writeable/ENABLE_INSTALL_TOOL ENABLE_INSTALL_TOOL
+    deploy: |
+        set -x
+
+        bin/console cache:clear --no-warmup || rm -rf var/cache/*
+        bin/console cache:warmup
+        ###FIRST_INSTALL>###
+        if [ ! -f web/typo3conf/writeable/installed.lock ]; then
+            php .misc/fix_db_charset.php
+
+            vendor/bin/typo3cms install:setup --non-interactive --skip-integrity-check \
+                --admin-user-name='admin' --admin-password='password' \
+                --site-setup-type='site' --site-name='TYPO3 with Bartacus on Platform.sh'
+
+            vendor/bin/typo3cms extension:setupactive
+            vendor/bin/typo3cms database:updateschema destructive
+            vendor/bin/typo3cms database:import < .misc/install.sql
+            vendor/bin/typo3cms database:updateschema destructive
+
+            touch web/typo3conf/writeable/installed.lock
+        fi
+        ###<FIRST_INSTALL###
+        vendor/bin/typo3cms cache:flush --force
+
+        vendor/bin/typo3cms install:fixfolderstructure
+
+        touch web/typo3conf/ENABLE_INSTALL_TOOL
+        vendor/bin/typo3cms database:updateschema safe
+        vendor/bin/typo3cms upgrade:all
+
+crons:
+    typo3:
+        spec: '*/5 * * * *'
+        cmd: 'vendor/bin/typo3cms scheduler:run'
