@@ -16,7 +16,7 @@ if ($config->isAvailable()) {
                 continue;
             }
 
-            $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['driver'] = 'pdo_mysql';
+            $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['driver'] = 'mysqli';
             $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host'] = $endpoint['host'];
             $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port'] = $endpoint['port'];
             $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname'] = $endpoint['path'];
