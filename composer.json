@@ -13,7 +13,7 @@
     "require": {
         "php": "^7.1",
         "bartacus/bartacus": "^1.0",
-        "bartacus/platformsh-bundle": "^1.0",
+        "bartacus/platformsh-bundle": "^1.1",
         "dmitryd/typo3-realurl": "^2.2",
         "helhum/typo3-console": "^4.4",
         "incenteev/composer-parameter-handler": "^2.0",

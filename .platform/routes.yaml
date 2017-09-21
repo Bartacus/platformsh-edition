@@ -1,4 +1,8 @@
 "https://{default}/":
+    # This is the URL how you would access your project on local development.
+    # This is needed for the RouteResolver for e.g. in RealURL and for adapting
+    # the domainName in sys_domain records with typo3cms domain:adapt command.
+    .local_url: "https://myproject.test/"
     type: upstream
     # the first part should be your project name
     upstream: "app:http"

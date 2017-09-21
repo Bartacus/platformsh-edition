@@ -138,6 +138,7 @@ hooks:
 
         touch web/typo3conf/ENABLE_INSTALL_TOOL
         vendor/bin/typo3cms database:updateschema safe
+        vendor/bin/typo3cms domain:adapt
         vendor/bin/typo3cms upgrade:all
 
 crons:
